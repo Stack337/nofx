@@ -6,6 +6,7 @@ import (
 	"time"
 
 	agentdomain "nofx/agent"
+	"nofx/risk"
 
 	"gorm.io/gorm"
 )
@@ -26,6 +27,9 @@ type agentDB struct {
 	LiveConfirmed bool      `gorm:"column:live_confirmed;not null;default:false"`
 	Enabled       bool      `gorm:"column:enabled;not null;default:false"`
 	Schedule      string    `gorm:"column:schedule;not null;default:''"`
+	KillSwitch    bool      `gorm:"column:kill_switch_enabled;not null;default:false"`
+	KillReason    string    `gorm:"column:kill_switch_reason;not null;default:''"`
+	KillChangedAt time.Time `gorm:"column:kill_switch_changed_at"`
 	CreatedAt     time.Time `gorm:"column:created_at;autoCreateTime;index:idx_ai_agents_user_created,priority:2,sort:desc"`
 	UpdatedAt     time.Time `gorm:"column:updated_at;autoUpdateTime"`
 }
@@ -89,6 +93,29 @@ func agentDBFromDomain(value agentdomain.Agent) agentDB {
 		Mode: string(value.Mode), LiveConfirmed: value.LiveConfirmed, Enabled: value.Enabled,
 		Schedule: value.Schedule, CreatedAt: value.CreatedAt, UpdatedAt: value.UpdatedAt,
 	}
+}
+
+func (s *AgentStore) GetState(ctx context.Context, agentID string) (risk.SwitchState, error) {
+	var record agentDB
+	if err := s.db.WithContext(ctx).Where("id = ?", agentID).First(&record).Error; err != nil {
+		return risk.SwitchState{}, fmt.Errorf("get kill switch: %w", err)
+	}
+	return risk.SwitchState{AgentID: record.ID, Enabled: record.KillSwitch, Reason: record.KillReason, ChangedAt: record.KillChangedAt}, nil
+}
+
+func (s *AgentStore) PutState(ctx context.Context, state risk.SwitchState) error {
+	result := s.db.WithContext(ctx).Model(&agentDB{}).Where("id = ?", state.AgentID).Updates(map[string]any{
+		"kill_switch_enabled":    state.Enabled,
+		"kill_switch_reason":     state.Reason,
+		"kill_switch_changed_at": state.ChangedAt,
+	})
+	if result.Error != nil {
+		return fmt.Errorf("persist kill switch: %w", result.Error)
+	}
+	if result.RowsAffected != 1 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
 }
 
 func agentFromDB(record agentDB) agentdomain.Agent {

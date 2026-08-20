@@ -8,6 +8,7 @@ import (
 	"time"
 
 	agentdomain "nofx/agent"
+	"nofx/risk"
 
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -101,5 +102,21 @@ func TestAgentIdempotencyReservationIsUnique(t *testing.T) {
 	got, err := s.Agent().GetReservation(ctx, "cycle-1:open:BTCUSDT")
 	if err != nil || got.ExchangeOrderID != "bybit-order-1" || got.CompletedAt == nil {
 		t.Fatalf("GetReservation() = %+v, %v", got, err)
+	}
+}
+
+func TestAgentStorePersistsKillSwitchState(t *testing.T) {
+	ctx := context.Background()
+	s := openAgentTestStore(t)
+	if err := s.Agent().Create(ctx, agentdomain.Agent{ID: "agent-1", UserID: "user-1", Name: "flash", ExchangeID: "bybit-1", AIModelID: "model-1"}); err != nil {
+		t.Fatalf("Create() error = %v", err)
+	}
+	switcher := risk.NewKillSwitch(s.Agent())
+	if err := switcher.Enable(ctx, "agent-1", "manual stop"); err != nil {
+		t.Fatalf("Enable() error = %v", err)
+	}
+	enabled, err := switcher.Enabled(ctx, "agent-1")
+	if err != nil || !enabled {
+		t.Fatalf("Enabled() = %v, %v", enabled, err)
 	}
 }

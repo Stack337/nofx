@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"nofx/agent"
-	"nofx/ai500"
 )
 
 const (
@@ -42,25 +41,36 @@ type RiskView struct {
 	OpenPositions                                    int
 }
 
+type CandidateView struct {
+	Symbol     string
+	Score      float64
+	LongScore  float64
+	ShortScore float64
+	Confidence float64
+	Regime     string
+	Reasons    []string
+}
+
 type DecisionRequest struct {
 	CycleID        string
 	AgentID        string
-	Candidates     []ai500.Candidate
+	Candidates     []CandidateView
 	Positions      []PositionView
 	Risk           RiskView
 	AllowedActions []agent.DecisionAction
 }
 
 type DecisionResponse struct {
-	Action     agent.DecisionAction `json:"action"`
-	Symbol     string               `json:"symbol"`
-	Side       string               `json:"side"`
-	Quantity   float64              `json:"quantity"`
-	Leverage   int                  `json:"leverage"`
-	StopLoss   *float64             `json:"stop_loss"`
-	TakeProfit *float64             `json:"take_profit"`
-	Confidence float64              `json:"confidence"`
-	Rationale  string               `json:"rationale"`
+	Action      agent.DecisionAction `json:"action"`
+	Symbol      string               `json:"symbol"`
+	Side        string               `json:"side"`
+	Quantity    float64              `json:"quantity"`
+	Leverage    int                  `json:"leverage"`
+	StopLoss    *float64             `json:"stop_loss"`
+	TakeProfit  *float64             `json:"take_profit"`
+	Confidence  float64              `json:"confidence"`
+	Rationale   string               `json:"rationale"`
+	GeneratedAt time.Time            `json:"-"`
 }
 
 type ProviderMeta struct {
