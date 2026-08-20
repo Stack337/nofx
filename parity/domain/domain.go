@@ -35,6 +35,7 @@ const (
 type Cycle struct {
 	ID        string
 	AgentID   string
+	OwnerID   string
 	State     CycleState
 	Shadow    bool
 	CreatedAt time.Time

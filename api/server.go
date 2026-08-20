@@ -410,6 +410,10 @@ After activating, create or update a trader with this strategy_id to apply it.`,
 				`Query: ?trader_id=<EXACT trader_id from GET /api/my-traders>
 Returns: {"is_running":<bool>,"trader_id":"<string>"}`,
 				s.handleStatus)
+			s.routeWithSchema(protected, "GET", "/parity/cycles", "Persisted parity cycle states and terminal errors",
+				`Query: ?agent_id=<EXACT trader_id from GET /api/my-traders>&limit=<int 1..100, default 20>
+Returns: {"cycles":[{"cycle_id":"<string>","state":"scheduled|collecting_context|analysis_round|tool_round|validating|executing|synchronizing|completed|failed","error_code":"<string>","error_message":"<string>"}]}`,
+				s.handleParityCycles)
 			s.routeWithSchema(protected, "GET", "/account", "Account balance and equity",
 				`Query: ?trader_id=<EXACT trader_id from GET /api/my-traders>
 Returns: {"balance":<float>,"equity":<float>,"unrealized_pnl":<float>,"initial_balance":<float>,"total_return_pct":<float>}`,

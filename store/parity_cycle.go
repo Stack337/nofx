@@ -18,6 +18,7 @@ type ParityCycleStore struct {
 type parityCycleDB struct {
 	ID            string     `gorm:"primaryKey;column:id"`
 	AgentID       string     `gorm:"column:agent_id;not null;index:idx_parity_cycles_agent_started"`
+	OwnerID       string     `gorm:"column:owner_id;not null;index:idx_parity_cycles_owner"`
 	State         string     `gorm:"column:state;not null;index"`
 	CorrelationID string     `gorm:"column:correlation_id;not null;uniqueIndex"`
 	Shadow        bool       `gorm:"column:shadow;not null;default:true"`
@@ -35,6 +36,7 @@ func (parityCycleDB) TableName() string { return "parity_cycles" }
 type ParityCycleRecord struct {
 	ID            string
 	AgentID       string
+	OwnerID       string
 	State         paritydomain.CycleState
 	CorrelationID string
 	Shadow        bool
@@ -70,6 +72,7 @@ func (s *ParityCycleStore) Create(cycle *paritydomain.Cycle, correlationID strin
 	record := &parityCycleDB{
 		ID:            cycle.ID,
 		AgentID:       cycle.AgentID,
+		OwnerID:       cycle.OwnerID,
 		State:         string(cycle.State),
 		CorrelationID: correlationID,
 		Shadow:        cycle.Shadow,
@@ -95,6 +98,7 @@ func (s *ParityCycleStore) Transition(id string, event paritydomain.CycleEvent) 
 		cycle := paritydomain.Cycle{
 			ID:        dbRecord.ID,
 			AgentID:   dbRecord.AgentID,
+			OwnerID:   dbRecord.OwnerID,
 			State:     paritydomain.CycleState(dbRecord.State),
 			Shadow:    dbRecord.Shadow,
 			CreatedAt: dbRecord.StartedAt,
@@ -156,12 +160,31 @@ func (s *ParityCycleStore) Get(id string) (*ParityCycleRecord, error) {
 	return parityRecordFromDB(&dbRecord), nil
 }
 
+// ListByAgent returns recent cycles for one agent without exposing other
+// agents' state to the API layer.
+func (s *ParityCycleStore) ListByAgent(agentID string, limit int) ([]*ParityCycleRecord, error) {
+	if limit <= 0 {
+		limit = 20
+	}
+	var rows []*parityCycleDB
+	if err := s.db.Where("agent_id = ?", agentID).
+		Order("started_at DESC").Limit(limit).Find(&rows).Error; err != nil {
+		return nil, fmt.Errorf("list parity cycles: %w", err)
+	}
+	result := make([]*ParityCycleRecord, 0, len(rows))
+	for _, row := range rows {
+		result = append(result, parityRecordFromDB(row))
+	}
+	return result, nil
+}
+
 func parityRecordFromDB(dbRecord *parityCycleDB) *ParityCycleRecord {
 	metadata := map[string]any{}
 	_ = json.Unmarshal([]byte(dbRecord.MetadataJSON), &metadata)
 	return &ParityCycleRecord{
 		ID:            dbRecord.ID,
 		AgentID:       dbRecord.AgentID,
+		OwnerID:       dbRecord.OwnerID,
 		State:         paritydomain.CycleState(dbRecord.State),
 		CorrelationID: dbRecord.CorrelationID,
 		Shadow:        dbRecord.Shadow,

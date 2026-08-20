@@ -3,6 +3,7 @@ package store
 import (
 	"path/filepath"
 	"testing"
+	"time"
 
 	paritydomain "nofx/parity/domain"
 
@@ -91,5 +92,37 @@ func TestParityCycleTransitionIsAtomic(t *testing.T) {
 	}
 	if record.State != paritydomain.CycleScheduled {
 		t.Fatalf("invalid transition persisted state %q", record.State)
+	}
+}
+
+func TestParityCycleListByAgentReturnsNewestFirstWithLimit(t *testing.T) {
+	t.Parallel()
+
+	s := openParityTestStore(t, filepath.Join(t.TempDir(), "parity.db"))
+	t.Cleanup(func() { _ = s.Close() })
+
+	first := paritydomain.NewCycle("cycle-old", "agent-1", true)
+	second := paritydomain.NewCycle("cycle-new", "agent-1", true)
+	other := paritydomain.NewCycle("cycle-other", "agent-2", true)
+	first.CreatedAt = first.CreatedAt.Add(-2 * time.Minute)
+	first.UpdatedAt = first.CreatedAt
+	second.CreatedAt = second.CreatedAt.Add(-time.Minute)
+	second.UpdatedAt = second.CreatedAt
+	if err := s.ParityCycle().Create(first, "corr-old", nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.ParityCycle().Create(second, "corr-new", nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.ParityCycle().Create(other, "corr-other", nil); err != nil {
+		t.Fatal(err)
+	}
+
+	records, err := s.ParityCycle().ListByAgent("agent-1", 1)
+	if err != nil {
+		t.Fatalf("list cycles: %v", err)
+	}
+	if len(records) != 1 || records[0].ID != "cycle-new" {
+		t.Fatalf("records = %+v", records)
 	}
 }

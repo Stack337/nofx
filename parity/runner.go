@@ -33,6 +33,7 @@ type CyclePersistence interface {
 
 type RunnerConfig struct {
 	AgentID    string
+	OwnerID    string
 	Shadow     bool
 	Deadline   time.Duration
 	RiskConfig RiskConfig
@@ -76,6 +77,7 @@ func (r *Runner) RunCycle(parent context.Context) (CycleResult, error) {
 	cycleID := r.idGenerator()
 	correlationID := uuid.NewString()
 	cycle := paritydomain.NewCycle(cycleID, r.config.AgentID, r.config.Shadow)
+	cycle.OwnerID = r.config.OwnerID
 	result := CycleResult{CycleID: cycleID, State: paritydomain.CycleScheduled}
 	if err := r.persistence.Create(cycle, correlationID, map[string]any{"shadow": r.config.Shadow}); err != nil {
 		return result, fmt.Errorf("create cycle: %w", err)
