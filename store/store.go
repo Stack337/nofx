@@ -29,6 +29,7 @@ type Store struct {
 	order          *OrderStore
 	grid           *GridStore
 	aiCharge       *AIChargeStore
+	parityCycle    *ParityCycleStore
 	telegramConfig TelegramConfigStore
 
 	mu sync.RWMutex
@@ -164,6 +165,9 @@ func (s *Store) initTables() error {
 	if err := s.AICharge().initTables(); err != nil {
 		return fmt.Errorf("failed to initialize AI charge tables: %w", err)
 	}
+	if err := s.ParityCycle().initTables(); err != nil {
+		return fmt.Errorf("failed to initialize parity cycle tables: %w", err)
+	}
 	return nil
 }
 
@@ -295,6 +299,16 @@ func (s *Store) AICharge() *AIChargeStore {
 		s.aiCharge = NewAIChargeStore(s.gdb)
 	}
 	return s.aiCharge
+}
+
+// ParityCycle gets persisted VergeX-parity cycle storage.
+func (s *Store) ParityCycle() *ParityCycleStore {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.parityCycle == nil {
+		s.parityCycle = NewParityCycleStore(s.gdb)
+	}
+	return s.parityCycle
 }
 
 // TelegramConfig gets Telegram bot configuration storage
