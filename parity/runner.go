@@ -68,6 +68,27 @@ func NewRunner(config RunnerConfig, persistence CyclePersistence, contextProvide
 	}
 }
 
+// StartCycle persists a shadow cycle before returning and runs the bounded
+// workflow asynchronously. Callers can use the returned ID to poll the API.
+func (r *Runner) StartCycle(parent context.Context) (string, error) {
+	r.mu.Lock()
+	cycleID := r.idGenerator()
+	correlationID := uuid.NewString()
+	cycle := paritydomain.NewCycle(cycleID, r.config.AgentID, r.config.Shadow)
+	cycle.OwnerID = r.config.OwnerID
+	if err := r.persistence.Create(cycle, correlationID, map[string]any{"shadow": r.config.Shadow}); err != nil {
+		r.mu.Unlock()
+		return "", fmt.Errorf("create cycle: %w", err)
+	}
+	r.mu.Unlock()
+	go func() {
+		r.mu.Lock()
+		defer r.mu.Unlock()
+		_, _ = r.runCycle(context.WithoutCancel(parent), cycleID, false)
+	}()
+	return cycleID, nil
+}
+
 // RunCycle serializes one agent's work and persists every boundary before
 // invoking the next component. It always returns a terminal state.
 func (r *Runner) RunCycle(parent context.Context) (CycleResult, error) {
@@ -75,12 +96,18 @@ func (r *Runner) RunCycle(parent context.Context) (CycleResult, error) {
 	defer r.mu.Unlock()
 
 	cycleID := r.idGenerator()
+	return r.runCycle(parent, cycleID, true)
+}
+
+func (r *Runner) runCycle(parent context.Context, cycleID string, create bool) (CycleResult, error) {
 	correlationID := uuid.NewString()
 	cycle := paritydomain.NewCycle(cycleID, r.config.AgentID, r.config.Shadow)
 	cycle.OwnerID = r.config.OwnerID
 	result := CycleResult{CycleID: cycleID, State: paritydomain.CycleScheduled}
-	if err := r.persistence.Create(cycle, correlationID, map[string]any{"shadow": r.config.Shadow}); err != nil {
-		return result, fmt.Errorf("create cycle: %w", err)
+	if create {
+		if err := r.persistence.Create(cycle, correlationID, map[string]any{"shadow": r.config.Shadow}); err != nil {
+			return result, fmt.Errorf("create cycle: %w", err)
+		}
 	}
 
 	deadline := r.config.Deadline

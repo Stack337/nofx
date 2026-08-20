@@ -9,9 +9,11 @@ import (
 	"nofx/crypto"
 	"nofx/logger"
 	"nofx/manager"
+	"nofx/parity"
 	"nofx/store"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -28,6 +30,8 @@ type Server struct {
 	port                      int
 	telegramReloadCh          chan<- struct{} // signal Telegram bot to reload
 	authLimiter               *ipRateLimiter  // per-IP throttle for login/register
+	parityMu                  sync.RWMutex
+	parityRunners             map[string]*parity.Runner
 }
 
 // NewServer Creates API server
@@ -53,7 +57,8 @@ func NewServer(traderManager *manager.TraderManager, st *store.Store, cryptoServ
 		// Auth throttle: allow a small burst (typos / page reloads) then ~1
 		// attempt every 6s (10/min) sustained per IP. Generous for a human,
 		// hostile to online password brute-force.
-		authLimiter: newIPRateLimiter(1.0/6.0, 8),
+		authLimiter:   newIPRateLimiter(1.0/6.0, 8),
+		parityRunners: make(map[string]*parity.Runner),
 	}
 
 	// Setup routes
@@ -414,6 +419,10 @@ Returns: {"is_running":<bool>,"trader_id":"<string>"}`,
 				`Query: ?agent_id=<EXACT trader_id from GET /api/my-traders>&limit=<int 1..100, default 20>
 Returns: {"cycles":[{"cycle_id":"<string>","state":"scheduled|collecting_context|analysis_round|tool_round|validating|executing|synchronizing|completed|failed","error_code":"<string>","error_message":"<string>"}]}`,
 				s.handleParityCycles)
+			s.routeWithSchema(protected, "POST", "/parity/cycles/run", "Start one registered parity cycle in its configured mode",
+				`Query: ?agent_id=<EXACT trader_id from GET /api/my-traders>
+Returns: {"cycle_id":"<string>","state":"scheduled"}. Shadow runner must be registered by the application.`,
+				s.handleStartParityCycle)
 			s.routeWithSchema(protected, "GET", "/account", "Account balance and equity",
 				`Query: ?trader_id=<EXACT trader_id from GET /api/my-traders>
 Returns: {"balance":<float>,"equity":<float>,"unrealized_pnl":<float>,"initial_balance":<float>,"total_return_pct":<float>}`,

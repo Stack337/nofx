@@ -35,6 +35,43 @@ func TestRunnerCompletesShadowCycle(t *testing.T) {
 	}
 }
 
+func TestRunnerStartCycleReturnsPersistedCycleID(t *testing.T) {
+	t.Parallel()
+
+	persistence := newFakeCyclePersistence()
+	runner := NewRunner(RunnerConfig{AgentID: "agent-1", Shadow: true}, persistence,
+		&fakeContextProvider{}, fakeAIWorkflow{}, NewShadowExecution(), noopSynchronizer{})
+
+	cycleID, err := runner.StartCycle(context.Background())
+	if err != nil {
+		t.Fatalf("start cycle: %v", err)
+	}
+	if cycleID == "" {
+		t.Fatal("start cycle returned an empty cycle ID")
+	}
+	if !persistence.waitForCycle(cycleID, time.Second) {
+		t.Fatalf("cycle %q was not persisted", cycleID)
+	}
+}
+
+func TestRunnerStartCycleDetachesHTTPRequestCancellation(t *testing.T) {
+	t.Parallel()
+
+	persistence := newFakeCyclePersistence()
+	runner := NewRunner(RunnerConfig{AgentID: "agent-1", Shadow: true}, persistence,
+		&fakeContextProvider{}, fakeAIWorkflow{}, NewShadowExecution(), noopSynchronizer{})
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if _, err := runner.StartCycle(ctx); err != nil {
+		t.Fatalf("start cycle: %v", err)
+	}
+	select {
+	case <-persistence.terminal:
+	case <-time.After(time.Second):
+		t.Fatal("detached cycle did not reach a terminal state")
+	}
+}
+
 func TestRunnerPersistsTerminalFailureForEveryStage(t *testing.T) {
 	t.Parallel()
 
@@ -163,16 +200,28 @@ type fakeCyclePersistence struct {
 	cycles       map[string]*paritydomain.Cycle
 	errorCode    string
 	errorMessage string
+	created      chan string
+	terminal     chan struct{}
 }
 
 func newFakeCyclePersistence() *fakeCyclePersistence {
-	return &fakeCyclePersistence{cycles: map[string]*paritydomain.Cycle{}}
+	return &fakeCyclePersistence{cycles: map[string]*paritydomain.Cycle{}, created: make(chan string, 1), terminal: make(chan struct{}, 1)}
 }
 
 func (f *fakeCyclePersistence) Create(cycle *paritydomain.Cycle, _ string, _ map[string]any) error {
 	copyCycle := *cycle
 	f.cycles[cycle.ID] = &copyCycle
+	f.created <- cycle.ID
 	return nil
+}
+
+func (f *fakeCyclePersistence) waitForCycle(id string, timeout time.Duration) bool {
+	select {
+	case createdID := <-f.created:
+		return createdID == id
+	case <-time.After(timeout):
+		return false
+	}
 }
 
 func (f *fakeCyclePersistence) Transition(id string, event paritydomain.CycleEvent) (*store.ParityCycleRecord, error) {
@@ -184,7 +233,11 @@ func (f *fakeCyclePersistence) Transition(id string, event paritydomain.CycleEve
 }
 
 func (f *fakeCyclePersistence) Complete(id string) (*store.ParityCycleRecord, error) {
-	return f.Transition(id, paritydomain.EventComplete)
+	record, err := f.Transition(id, paritydomain.EventComplete)
+	if err == nil {
+		f.terminal <- struct{}{}
+	}
+	return record, err
 }
 
 func (f *fakeCyclePersistence) Fail(id, code, message string) (*store.ParityCycleRecord, error) {
@@ -196,6 +249,7 @@ func (f *fakeCyclePersistence) Fail(id, code, message string) (*store.ParityCycl
 	f.errorMessage = message
 	record.ErrorCode = code
 	record.ErrorMessage = message
+	f.terminal <- struct{}{}
 	return record, nil
 }
 
