@@ -62,3 +62,18 @@ func (s *AgentStore) GetCycle(ctx context.Context, id string) (agentdomain.Agent
 		Attempt: record.Attempt, Deadline: record.Deadline, ErrorCode: record.ErrorCode,
 	}, nil
 }
+
+func (s *AgentStore) ListCycles(ctx context.Context, agentID string, limit int) ([]agentdomain.AgentCycle, error) {
+	if limit <= 0 {
+		limit = 20
+	}
+	var records []agentCycleDB
+	if err := s.db.WithContext(ctx).Where("agent_id = ?", agentID).Order("created_at DESC").Limit(limit).Find(&records).Error; err != nil {
+		return nil, fmt.Errorf("list agent cycles: %w", err)
+	}
+	result := make([]agentdomain.AgentCycle, 0, len(records))
+	for _, record := range records {
+		result = append(result, agentdomain.AgentCycle{ID: record.ID, AgentID: record.AgentID, Status: agentdomain.CycleStatus(record.Status), Attempt: record.Attempt, Deadline: record.Deadline, ErrorCode: record.ErrorCode})
+	}
+	return result, nil
+}
