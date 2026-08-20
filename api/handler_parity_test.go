@@ -67,3 +67,18 @@ func TestHandleRegisterParityRunnerRequiresAgentID(t *testing.T) {
 		t.Fatalf("status = %d, want 400", recorder.Code)
 	}
 }
+
+func TestHandleRegisterParityRunnerRejectsMissingAI500Store(t *testing.T) {
+	t.Parallel()
+
+	gin.SetMode(gin.TestMode)
+	server := &Server{}
+	recorder := httptest.NewRecorder()
+	context, _ := gin.CreateTestContext(recorder)
+	context.Request = httptest.NewRequest("POST", "/api/parity/runners?agent_id=agent-1", nil)
+
+	server.handleRegisterParityRunner(context)
+	if recorder.Code != 503 {
+		t.Fatalf("status = %d, want 503", recorder.Code)
+	}
+}

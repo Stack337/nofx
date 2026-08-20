@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"nofx/ai500"
 	"nofx/auth"
 	"nofx/crypto"
 	"nofx/logger"
@@ -32,6 +33,13 @@ type Server struct {
 	authLimiter               *ipRateLimiter  // per-IP throttle for login/register
 	parityMu                  sync.RWMutex
 	parityRunners             map[string]*parity.Runner
+	ai500Store                ai500.ObservationStore
+	ai500Symbols              []string
+}
+
+func (s *Server) SetAI500CandidateSource(observations ai500.ObservationStore, symbols []string) {
+	s.ai500Store = observations
+	s.ai500Symbols = append([]string(nil), symbols...)
 }
 
 // NewServer Creates API server

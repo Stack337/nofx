@@ -28,9 +28,14 @@ type PositionSnapshot struct {
 }
 
 type CandidateSnapshot struct {
-	Symbol  string
-	Score   float64
-	Sources []string
+	Symbol        string
+	Score         float64
+	LongScore     float64
+	ShortScore    float64
+	Confidence    float64
+	Regime        string
+	ObservationID string
+	Sources       []string
 }
 
 type CandleSnapshot struct {
@@ -141,10 +146,13 @@ func normalizeCandidates(candidates []CandidateSnapshot) []CandidateSnapshot {
 			continue
 		}
 		if index, exists := indexes[candidate.Symbol]; exists {
+			mergedSources := mergeSources(result[index].Sources, candidate.Sources)
 			if candidate.Score > result[index].Score {
-				result[index].Score = candidate.Score
+				candidate.Sources = mergedSources
+				result[index] = candidate
+			} else {
+				result[index].Sources = mergedSources
 			}
-			result[index].Sources = mergeSources(result[index].Sources, candidate.Sources)
 			continue
 		}
 		indexes[candidate.Symbol] = len(result)

@@ -90,6 +90,20 @@ func TestContextRetainsPositionWhenItsMarketFetchFails(t *testing.T) {
 	}
 }
 
+func TestNormalizeCandidatesPreservesDirectionalFieldsFromHighestScore(t *testing.T) {
+	got := normalizeCandidates([]CandidateSnapshot{
+		{Symbol: "sol-usdt", Score: 71, LongScore: 20, ShortScore: 80, Confidence: 61, Regime: "bearish", ObservationID: "old", Sources: []string{"exchange"}},
+		{Symbol: "SOLUSDT", Score: 84, LongScore: 90, ShortScore: 30, Confidence: 88, Regime: "bullish", ObservationID: "new", Sources: []string{"ai500"}},
+	})
+	want := []CandidateSnapshot{{
+		Symbol: "SOLUSDT", Score: 84, LongScore: 90, ShortScore: 30, Confidence: 88,
+		Regime: "bullish", ObservationID: "new", Sources: []string{"exchange", "ai500"},
+	}}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("normalized candidates = %#v, want %#v", got, want)
+	}
+}
+
 func validMarket(symbol string, price float64, now time.Time) MarketSnapshot {
 	return MarketSnapshot{
 		Symbol:         symbol,

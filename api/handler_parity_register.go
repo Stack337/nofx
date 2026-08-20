@@ -1,11 +1,11 @@
 package api
 
 import (
-	"context"
 	"net/http"
 	"strings"
 	"time"
 
+	"nofx/ai500"
 	"nofx/market"
 	"nofx/mcp"
 	_ "nofx/mcp/provider"
@@ -19,6 +19,13 @@ func (s *Server) handleRegisterParityRunner(c *gin.Context) {
 	agentID := strings.TrimSpace(c.Query("agent_id"))
 	if agentID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "agent_id is required"})
+		return
+	}
+	if s.ai500Store == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{
+			"error":      "AI500 observation store is unavailable",
+			"error_code": "ai500_store_unavailable",
+		})
 		return
 	}
 	userID := c.GetString("user_id")
@@ -53,9 +60,7 @@ func (s *Server) handleRegisterParityRunner(c *gin.Context) {
 	model := strings.TrimSpace(fullConfig.AIModel.CustomModelName)
 	workflow := parity.NewOpenAIWorkflow(aiClient, model, 3)
 	exchangeReader := bybit.NewBybitTrader(fullConfig.Exchange.APIKey.String(), fullConfig.Exchange.SecretKey.String())
-	contextProvider := parity.NewExchangeContextProvider(exchangeReader, market.NewAPIClient(), func(context.Context) ([]parity.CandidateSnapshot, error) {
-		return []parity.CandidateSnapshot{}, nil
-	})
+	contextProvider := parity.NewExchangeContextProvider(exchangeReader, market.NewAPIClient(), ai500.NewCandidateProvider(s.ai500Store, s.ai500Symbols))
 	runner := parity.NewRunner(parity.RunnerConfig{
 		AgentID: agentID, OwnerID: userID, Shadow: true, Deadline: 3 * time.Minute,
 		RiskConfig: parity.RiskConfig{
