@@ -14,6 +14,7 @@ import (
 	"nofx/parity"
 	"nofx/store"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -513,6 +514,35 @@ Returns: {"total_trades","win_trades","loss_trades","win_rate","profit_factor","
 
 		}
 	}
+	if dist := strings.TrimSpace(os.Getenv("WEB_DIST_PATH")); dist != "" {
+		configureFrontend(s.router, dist)
+	}
+}
+
+func configureFrontend(router *gin.Engine, dist string) {
+	index := filepath.Join(dist, "index.html")
+	if info, err := os.Stat(index); err != nil || info.IsDir() {
+		return
+	}
+	assets := filepath.Join(dist, "assets")
+	if info, err := os.Stat(assets); err == nil && info.IsDir() {
+		router.Static("/assets", assets)
+	}
+	router.NoRoute(func(c *gin.Context) {
+		if strings.HasPrefix(c.Request.URL.Path, "/api/") {
+			c.Status(http.StatusNotFound)
+			return
+		}
+		relative := strings.TrimPrefix(filepath.Clean(c.Request.URL.Path), string(filepath.Separator))
+		candidate := filepath.Join(dist, relative)
+		if relative != "." && strings.HasPrefix(candidate, filepath.Clean(dist)+string(filepath.Separator)) {
+			if info, err := os.Stat(candidate); err == nil && !info.IsDir() {
+				c.File(candidate)
+				return
+			}
+		}
+		c.File(index)
+	})
 }
 
 // handleHealth Health check
