@@ -34,6 +34,7 @@ type DecisionInput struct {
 	Action             Action
 	Leverage           int
 	PositionSizeUSD    float64
+	Quantity           float64
 	StopLoss           float64
 	TakeProfit         float64
 	MarketPrice        float64
