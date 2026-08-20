@@ -22,9 +22,9 @@
 ### Task 1: Create the parity domain and cycle state machine
 
 **Files:**
-- Create: `nofx-source/parity/domain.go`
-- Create: `nofx-source/parity/cycle_state.go`
-- Test: `nofx-source/parity/cycle_state_test.go`
+- Create: `nofx-source/parity/domain/domain.go`
+- Create: `nofx-source/parity/domain/cycle_state.go`
+- Test: `nofx-source/parity/domain/cycle_state_test.go`
 
 **Interfaces:**
 - Produces `CycleState`, `CycleEvent`, `CycleError`, and validated transitions for the orchestrator.
@@ -50,7 +50,7 @@ Expected: PASS.
 
 - [ ] **Step 5: Commit**
 
-Run: `git add parity/domain.go parity/cycle_state.go parity/cycle_state_test.go && git commit -m "feat: add parity cycle state machine"`
+Run: `git add parity/domain && git commit -m "feat: add parity cycle state machine"`
 
 ### Task 2: Add persisted cycle and diagnostic records
 
@@ -61,7 +61,7 @@ Run: `git add parity/domain.go parity/cycle_state.go parity/cycle_state_test.go 
 
 **Interfaces:**
 - Produces `ParityCycleStore.Create`, `Transition`, `Complete`, `Fail`, and `Get`.
-- Consumes the types from `parity/cycle_state.go`.
+- Consumes the types from `parity/domain/cycle_state.go`.
 
 - [ ] **Step 1: Write tests for durable transitions and correlation IDs**
 

@@ -1,4 +1,4 @@
-package parity
+package domain
 
 import "time"
 
