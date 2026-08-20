@@ -26,6 +26,7 @@ import { DataPage } from '../pages/DataPage'
 import { SettingsPage } from '../pages/SettingsPage'
 import { StrategyStudioPage } from '../pages/StrategyStudioPage'
 import { TerminalDashboard } from '../components/terminal/TerminalDashboard'
+import { AgentDashboardPage } from '../components/agents/AgentDashboardPage'
 import { useAuth } from '../contexts/AuthContext'
 import { useLanguage } from '../contexts/LanguageContext'
 import { useSystemConfig } from '../hooks/useSystemConfig'
@@ -496,6 +497,10 @@ export function AppRoutes() {
         <Route
           path={ROUTES.dashboard}
           element={isAuthenticated ? <DashboardRoute /> : <LandingPage />}
+        />
+        <Route
+          path={ROUTES.agents}
+          element={isAuthenticated ? <AgentDashboardPage /> : <Navigate to={ROUTES.login} replace />}
         />
         <Route
           path={ROUTES.strategy}

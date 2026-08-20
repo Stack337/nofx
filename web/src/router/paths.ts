@@ -24,6 +24,7 @@ export const ROUTES = {
   dashboard: '/dashboard',
   strategy: '/strategy',
   strategyMarket: '/strategy-market',
+  agents: '/agents',
 } as const
 
 export const PAGE_PATHS: Record<Page, string> = {
