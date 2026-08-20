@@ -29,6 +29,8 @@ services:
     environment:
       API_SERVER_PORT: "18080"
       JWT_SECRET: ${AGENT_JWT_SECRET:?set AGENT_JWT_SECRET}
+      RSA_PRIVATE_KEY: ${RSA_PRIVATE_KEY:?set RSA_PRIVATE_KEY}
+      DATA_ENCRYPTION_KEY: ${AGENT_DATA_ENCRYPTION_KEY:?set AGENT_DATA_ENCRYPTION_KEY}
       DB_TYPE: postgres
       DB_HOST: private-agent-postgres
       DB_PORT: "5432"
