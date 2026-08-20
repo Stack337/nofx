@@ -50,6 +50,9 @@ func (r *Router) Execute(ctx context.Context, mode agent.Mode, authorized risk.A
 	if err != nil {
 		return OrderResult{}, err
 	}
+	if modeValue != PositionModeOneWay {
+		return OrderResult{}, &ExchangeError{Code: "position_mode_mismatch", Message: "live execution requires one-way position mode"}
+	}
 	instrument, err := r.exchange.Instrument(ctx, decision.Symbol)
 	if err != nil {
 		return OrderResult{}, err

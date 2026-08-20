@@ -36,6 +36,9 @@ type RiskEngine interface {
 type ExecutionRouter interface {
 	Execute(context.Context, agent.Mode, risk.AuthorizedDecision, string) (execution.OrderResult, error)
 }
+type HealthGate interface {
+	Ready(context.Context, agent.Agent) error
+}
 
 type AuditEvent struct {
 	Type, AgentID, CycleID, ErrorCode string
@@ -54,6 +57,7 @@ type Service struct {
 	Risk         RiskEngine
 	Router       ExecutionRouter
 	Audit        AuditWriter
+	Health       HealthGate
 	Policy       risk.Policy
 	RankConfig   ai500.RankConfig
 	Now          func() time.Time
@@ -100,6 +104,14 @@ func (s *Service) RunCycle(parent context.Context, agentID string) (agent.AgentC
 		}
 		return cycle, cause
 	}
+	if configuration.Mode == agent.ModeLive {
+		if s.Health == nil {
+			return fail(agent.CycleFailed, "live_health_gate_missing", errors.New("live health gate is not configured"))
+		}
+		if err := s.Health.Ready(ctx, configuration); err != nil {
+			return fail(agent.CycleFailed, "live_preflight_failed", err)
+		}
+	}
 	observations, accountRisk, err := s.Collector.Collect(ctx, configuration)
 	if err != nil {
 		return fail(agent.CycleFailed, "market_context_failed", err)
@@ -116,22 +128,25 @@ func (s *Service) RunCycle(parent context.Context, agentID string) (agent.AgentC
 	}
 	decision, _, err := s.Provider.Decide(ctx, provider.DecisionRequest{CycleID: cycle.ID, AgentID: agentID, Candidates: views, AllowedActions: []agent.DecisionAction{agent.DecisionOpen, agent.DecisionClose, agent.DecisionHold}})
 	if err != nil {
-		return fail(agent.CycleFailed, "provider_failed", err)
+		return fail(agent.CycleFailed, typedCode(err, "provider_failed"), err)
 	}
 	if decision.GeneratedAt.IsZero() {
 		decision.GeneratedAt = now
 	}
 	authorized, err := s.Risk.Authorize(ctx, decision, accountRisk, s.Policy)
 	if err != nil {
-		return fail(agent.CycleFailed, "risk_rejected", err)
+		return fail(agent.CycleFailed, typedCode(err, "risk_rejected"), err)
 	}
 	authorized.LiveConfirmed = configuration.LiveConfirmed
 	_, err = s.Router.Execute(ctx, configuration.Mode, authorized, cycle.ID)
 	if errors.Is(err, execution.ErrNeedsReconciliation) {
 		return fail(agent.CycleNeedsReconciliation, "order_unknown", err)
 	}
+	if errors.Is(err, execution.ErrLiveGate) {
+		return fail(agent.CycleFailed, "live_unconfirmed", err)
+	}
 	if err != nil {
-		return fail(agent.CycleFailed, "execution_failed", err)
+		return fail(agent.CycleFailed, typedCode(err, "execution_failed"), err)
 	}
 	if err := s.Cycles.TransitionCycle(ctx, cycle.ID, agent.CycleProcessing, agent.CycleCompleted, ""); err != nil {
 		return cycle, err
@@ -156,3 +171,19 @@ func (s *Service) acquire(id string) bool {
 	return true
 }
 func (s *Service) release(id string) { s.mu.Lock(); delete(s.running, id); s.mu.Unlock() }
+
+func typedCode(err error, fallback string) string {
+	var decisionErr *provider.DecisionError
+	if errors.As(err, &decisionErr) && decisionErr.Code != "" {
+		return decisionErr.Code
+	}
+	var rejection *risk.Rejection
+	if errors.As(err, &rejection) && rejection.Code != "" {
+		return rejection.Code
+	}
+	var exchangeErr *execution.ExchangeError
+	if errors.As(err, &exchangeErr) && exchangeErr.Code != "" {
+		return exchangeErr.Code
+	}
+	return fallback
+}

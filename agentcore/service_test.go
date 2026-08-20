@@ -71,9 +71,15 @@ type fakeRouter struct {
 	calls  int
 }
 
-func (r *fakeRouter) Execute(context.Context, agent.Mode, risk.AuthorizedDecision, string) (execution.OrderResult, error) {
+func (r *fakeRouter) Execute(_ context.Context, mode agent.Mode, authorized risk.AuthorizedDecision, _ string) (execution.OrderResult, error) {
 	r.calls++
-	return r.result, r.err
+	if r.err != nil {
+		return r.result, r.err
+	}
+	if mode == agent.ModeLive && !authorized.LiveConfirmed {
+		return execution.OrderResult{}, execution.ErrLiveGate
+	}
+	return r.result, nil
 }
 
 type fakeAudit struct{ events int }

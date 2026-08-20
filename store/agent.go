@@ -40,6 +40,10 @@ func NewAgentStore(db *gorm.DB) *AgentStore {
 	return &AgentStore{db: db}
 }
 
+func (s *AgentStore) InitTables() error {
+	return s.initTables()
+}
+
 func (s *AgentStore) initTables() error {
 	return s.db.AutoMigrate(&agentDB{}, &agentCycleDB{}, &agentIdempotencyDB{})
 }

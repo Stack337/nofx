@@ -208,3 +208,16 @@ func containsSymbol(symbols []string, symbol string) bool {
 func decisionError(code, message string, cause error) *DecisionError {
 	return &DecisionError{Code: code, Message: message, Cause: cause}
 }
+
+func ClassifyHTTPStatus(status int) *DecisionError {
+	switch status {
+	case 429:
+		return decisionError("provider_http_429", "AI provider rate limited the request", nil)
+	case 404:
+		return decisionError("provider_http_404", "AI provider endpoint was not found", nil)
+	case 500:
+		return decisionError("provider_http_500", "AI provider returned an internal error", nil)
+	default:
+		return decisionError(fmt.Sprintf("provider_http_%d", status), "AI provider returned an unexpected HTTP status", nil)
+	}
+}

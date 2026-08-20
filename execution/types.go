@@ -3,6 +3,7 @@ package execution
 import (
 	"context"
 	"errors"
+	"strconv"
 )
 
 type PositionMode string
@@ -66,4 +67,29 @@ type Exchange interface {
 	Place(context.Context, OrderRequest) (OrderResult, error)
 	GetOrder(context.Context, string, string) (OrderState, error)
 	SetProtection(context.Context, ProtectionRequest) error
+}
+
+type ExchangeError struct {
+	Code    string
+	Status  int
+	RetCode int
+	Message string
+}
+
+func (e *ExchangeError) Error() string {
+	if e == nil {
+		return ""
+	}
+	if e.Message != "" {
+		return e.Message
+	}
+	return e.Code
+}
+
+func HTTPStatusError(status int, message string) error {
+	return &ExchangeError{Code: "exchange_http_" + strconv.Itoa(status), Status: status, Message: message}
+}
+
+func RetCodeError(code int, message string) error {
+	return &ExchangeError{Code: "exchange_retcode_" + strconv.Itoa(code), RetCode: code, Message: message}
 }

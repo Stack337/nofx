@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"errors"
 	"github.com/google/uuid"
 	"net/http"
@@ -66,7 +67,7 @@ func (s *Server) handleAgentStart(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "agent not found"})
 		return
 	}
-	ctx := c.Request.Context()
+	ctx := context.Background()
 	go func() { _, _ = s.agentService.RunCycle(ctx, agentID) }()
 	c.JSON(http.StatusAccepted, gin.H{"agent_id": agentID, "status": "queued"})
 }
