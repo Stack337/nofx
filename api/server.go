@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"nofx/agentcore"
 	"nofx/ai500"
 	"nofx/auth"
 	"nofx/crypto"
@@ -36,7 +37,12 @@ type Server struct {
 	ai500Store                ai500.ObservationStore
 	ai500Symbols              []string
 	ai500ScoreTTL             time.Duration
+	agentService              *agentcore.Service
 }
+
+// SetAgentService wires the private AI-agent lifecycle without touching the
+// existing trader manager. Live mode remains controlled by the agent store.
+func (s *Server) SetAgentService(service *agentcore.Service) { s.agentService = service }
 
 func (s *Server) SetAI500CandidateSource(observations ai500.ObservationStore, symbols []string) {
 	s.ai500Store = observations
@@ -225,6 +231,15 @@ func (s *Server) setupRoutes() {
 		// Routes requiring authentication
 		protected := api.Group("/", s.authMiddleware())
 		{
+			s.route(protected, "GET", "/agents", "List private AI agents", s.handleListAgents)
+			s.route(protected, "POST", "/agents", "Create a private AI agent in Shadow mode", s.handleCreateAgent)
+			s.route(protected, "GET", "/agents/:id", "Get private AI agent status", s.handleGetAgent)
+			s.route(protected, "POST", "/agents/:id/start", "Queue one private AI-agent cycle", s.handleAgentStart)
+			s.route(protected, "POST", "/agents/:id/stop", "Enable the private agent kill switch", s.handleAgentStop)
+			s.route(protected, "POST", "/agents/:id/kill-switch", "Enable or disable private agent kill switch", s.handleAgentKillSwitch)
+			s.route(protected, "POST", "/agents/:id/live-confirmation", "Explicitly enable Live mode for one agent", s.handleAgentLiveConfirmation)
+			s.route(protected, "GET", "/agents/:id/cycles", "List recent private agent cycles", s.handleAgentCycles)
+
 			// Logout (add to blacklist)
 			s.route(protected, "POST", "/logout", "Logout (blacklist token)", s.handleLogout)
 			s.route(protected, "POST", "/onboarding/beginner", "Prepare beginner claw402 wallet and default model", s.handleBeginnerOnboarding)

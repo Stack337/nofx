@@ -30,6 +30,7 @@ type Store struct {
 	grid           *GridStore
 	aiCharge       *AIChargeStore
 	parityCycle    *ParityCycleStore
+	agent          *AgentStore
 	telegramConfig TelegramConfigStore
 
 	mu sync.RWMutex
@@ -167,6 +168,9 @@ func (s *Store) initTables() error {
 	}
 	if err := s.ParityCycle().initTables(); err != nil {
 		return fmt.Errorf("failed to initialize parity cycle tables: %w", err)
+	}
+	if err := s.Agent().initTables(); err != nil {
+		return fmt.Errorf("failed to initialize agent tables: %w", err)
 	}
 	return nil
 }
@@ -309,6 +313,15 @@ func (s *Store) ParityCycle() *ParityCycleStore {
 		s.parityCycle = NewParityCycleStore(s.gdb)
 	}
 	return s.parityCycle
+}
+
+func (s *Store) Agent() *AgentStore {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.agent == nil {
+		s.agent = NewAgentStore(s.gdb)
+	}
+	return s.agent
 }
 
 // TelegramConfig gets Telegram bot configuration storage
