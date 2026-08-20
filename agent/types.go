@@ -41,6 +41,22 @@ type AgentCycle struct {
 	ErrorCode string
 }
 
+type Agent struct {
+	ID            string
+	UserID        string
+	Name          string
+	ExchangeID    string
+	AIModelID     string
+	StrategyID    string
+	RiskProfileID string
+	Mode          Mode
+	LiveConfirmed bool
+	Enabled       bool
+	Schedule      string
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
+}
+
 type CycleRunner interface {
 	Run(context.Context, AgentCycle) error
 }

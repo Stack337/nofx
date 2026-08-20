@@ -68,6 +68,10 @@ func validTransition(from, to CycleStatus) bool {
 	}
 }
 
+func CanTransition(from, to CycleStatus) bool {
+	return validTransition(from, to)
+}
+
 func RunWithDeadline(parent context.Context, cycle *Cycle, runner CycleRunner) error {
 	if err := cycle.Transition(CycleProcessing, ""); err != nil {
 		return err
