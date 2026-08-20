@@ -36,10 +36,12 @@ type ObservationStore interface {
 }
 
 type JSONLStore struct {
-	path         string
-	mu           sync.Mutex
-	fingerprints map[string]struct{}
-	observations map[string][]ScoreObservation
+	path            string
+	mu              sync.Mutex
+	fingerprints    map[string]struct{}
+	observations    map[string][]ScoreObservation
+	allObservations []ScoreObservation
+	outcomes        []OutcomeLabel
 }
 
 type observationRecord struct {
@@ -92,6 +94,7 @@ func (s *JSONLStore) Put(ctx context.Context, observation ScoreObservation) erro
 	}
 	s.fingerprints[fingerprint] = struct{}{}
 	s.observations[observation.Symbol] = append(s.observations[observation.Symbol], observation)
+	s.allObservations = append(s.allObservations, observation)
 	return nil
 }
 
@@ -99,7 +102,10 @@ func (s *JSONLStore) GetLatest(ctx context.Context, symbol string) (ScoreObserva
 	if err := ctx.Err(); err != nil {
 		return ScoreObservation{}, err
 	}
-	symbol = market.Normalize(symbol)
+	symbol = strings.TrimSpace(symbol)
+	if symbol != "" {
+		symbol = market.Normalize(symbol)
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	items := s.observations[symbol]
@@ -116,16 +122,42 @@ func (s *JSONLStore) ListObservations(ctx context.Context, symbol string, limit 
 	if limit < 1 {
 		return []ScoreObservation{}, nil
 	}
-	symbol = market.Normalize(symbol)
+	symbol = strings.TrimSpace(symbol)
+	if symbol != "" {
+		symbol = market.Normalize(symbol)
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	items := s.observations[symbol]
+	if symbol == "" {
+		items = s.allObservations
+	}
 	if len(items) > limit {
 		items = items[len(items)-limit:]
 	}
 	result := make([]ScoreObservation, len(items))
 	for index := range items {
 		result[len(items)-1-index] = cloneObservation(items[index])
+	}
+	return result, nil
+}
+
+func (s *JSONLStore) ListOutcomes(ctx context.Context, limit int) ([]OutcomeLabel, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if limit < 1 {
+		return []OutcomeLabel{}, nil
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	start := 0
+	if len(s.outcomes) > limit {
+		start = len(s.outcomes) - limit
+	}
+	result := append([]OutcomeLabel(nil), s.outcomes[start:]...)
+	for left, right := 0, len(result)-1; left < right; left, right = left+1, right-1 {
+		result[left], result[right] = result[right], result[left]
 	}
 	return result, nil
 }
@@ -146,7 +178,11 @@ func (s *JSONLStore) AddOutcome(ctx context.Context, outcome OutcomeLabel) error
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return s.appendRecord(observationRecord{Kind: "outcome", Outcome: &outcome})
+	if err := s.appendRecord(observationRecord{Kind: "outcome", Outcome: &outcome}); err != nil {
+		return err
+	}
+	s.outcomes = append(s.outcomes, outcome)
+	return nil
 }
 
 func (s *JSONLStore) load() error {
@@ -162,7 +198,14 @@ func (s *JSONLStore) load() error {
 	scanner.Buffer(make([]byte, 64*1024), 4*1024*1024)
 	for scanner.Scan() {
 		var record observationRecord
-		if json.Unmarshal(scanner.Bytes(), &record) != nil || record.Kind != "observation" || record.Observation == nil {
+		if json.Unmarshal(scanner.Bytes(), &record) != nil {
+			continue
+		}
+		if record.Kind == "outcome" && record.Outcome != nil {
+			s.outcomes = append(s.outcomes, *record.Outcome)
+			continue
+		}
+		if record.Kind != "observation" || record.Observation == nil {
 			continue
 		}
 		observation := cloneObservation(*record.Observation)
@@ -171,6 +214,8 @@ func (s *JSONLStore) load() error {
 		}
 		s.fingerprints[observation.ID] = struct{}{}
 		s.observations[observation.Symbol] = append(s.observations[observation.Symbol], observation)
+		s.allObservations = append(s.allObservations, observation)
+		continue
 	}
 	if err := scanner.Err(); err != nil {
 		return fmt.Errorf("read AI500 observations: %w", err)
@@ -180,6 +225,9 @@ func (s *JSONLStore) load() error {
 			return s.observations[symbol][i].CapturedAt.Before(s.observations[symbol][j].CapturedAt)
 		})
 	}
+	sort.SliceStable(s.allObservations, func(i, j int) bool {
+		return s.allObservations[i].CapturedAt.Before(s.allObservations[j].CapturedAt)
+	})
 	return nil
 }
 

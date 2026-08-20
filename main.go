@@ -137,6 +137,9 @@ func main() {
 
 	// Start API server
 	server := api.NewServer(traderManager, st, cryptoService, cfg.APIServerPort)
+	if err := server.ConfigureAI500Shadow(cfg.AI500.Enabled, cfg.AI500.ObservationPath, cfg.AI500.Symbols, cfg.AI500.ScoreTTL); err != nil {
+		logger.Fatalf("❌ Failed to initialize AI500 shadow store: %v", err)
+	}
 
 	go func() {
 		if err := server.Start(); err != nil {

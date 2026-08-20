@@ -275,6 +275,12 @@ If NOFX is useful to you, a star helps other traders find it.
 
 [![Star History Chart](https://api.star-history.com/svg?repos=NoFxAiOS/nofx&type=Date)](https://star-history.com/#NoFxAiOS/nofx&Date)
 
+## Independent AI500 shadow scoring
+
+The repository includes an independent, disabled-by-default AI500-compatible scoring engine. It stores aggregate and directional scores, creates offline outcome labels, and feeds only the parity shadow runner. It does not enable live execution or submit exchange orders.
+
+Set `AI500_SHADOW_ENABLED=true`, `AI500_OBSERVATION_PATH`, and a comma-separated `AI500_SYMBOLS` list to expose authenticated read-only endpoints under `/api/ai500/*`. Provider/model settings identify the scorer used to create observations; credentials remain in the existing model configuration and are never returned by these endpoints.
+
 ## License
 
 [AGPL-3.0](LICENSE)

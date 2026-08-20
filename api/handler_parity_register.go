@@ -60,7 +60,7 @@ func (s *Server) handleRegisterParityRunner(c *gin.Context) {
 	model := strings.TrimSpace(fullConfig.AIModel.CustomModelName)
 	workflow := parity.NewOpenAIWorkflow(aiClient, model, 3)
 	exchangeReader := bybit.NewBybitTrader(fullConfig.Exchange.APIKey.String(), fullConfig.Exchange.SecretKey.String())
-	contextProvider := parity.NewExchangeContextProvider(exchangeReader, market.NewAPIClient(), ai500.NewCandidateProvider(s.ai500Store, s.ai500Symbols))
+	contextProvider := parity.NewExchangeContextProvider(exchangeReader, market.NewAPIClient(), ai500.NewCandidateProviderWithConfig(s.ai500Store, s.ai500Symbols, ai500.CandidateProviderConfig{TTL: s.ai500ScoreTTL}))
 	runner := parity.NewRunner(parity.RunnerConfig{
 		AgentID: agentID, OwnerID: userID, Shadow: true, Deadline: 3 * time.Minute,
 		RiskConfig: parity.RiskConfig{

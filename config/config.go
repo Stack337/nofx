@@ -7,6 +7,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // insecureDefaultJWTSecret is the historical fallback value. Refusing to boot when
@@ -53,6 +54,17 @@ type Config struct {
 	AlpacaSecretKey string // Alpaca secret key
 	TwelveDataKey   string // TwelveData API key for forex & metals
 
+	AI500 AI500Config
+}
+
+type AI500Config struct {
+	Enabled          bool
+	Provider         string
+	Model            string
+	ScoreTTL         time.Duration
+	FeatureFreshness time.Duration
+	ObservationPath  string
+	Symbols          []string
 }
 
 // MustInit initializes global configuration or panics. Use from main() so the
@@ -122,6 +134,7 @@ func initConfig() error {
 	cfg.AlpacaAPIKey = os.Getenv("ALPACA_API_KEY")
 	cfg.AlpacaSecretKey = os.Getenv("ALPACA_SECRET_KEY")
 	cfg.TwelveDataKey = os.Getenv("TWELVEDATA_API_KEY")
+	cfg.AI500 = loadAI500Config()
 
 	// Database configuration
 	if v := os.Getenv("DB_TYPE"); v != "" {
@@ -167,6 +180,47 @@ func initConfig() error {
 		})
 	}
 	return nil
+}
+
+func loadAI500Config() AI500Config {
+	result := AI500Config{
+		ScoreTTL:         10 * time.Minute,
+		FeatureFreshness: 10 * time.Minute,
+		ObservationPath:  "data/ai500/observations.jsonl",
+	}
+	result.Enabled = strings.EqualFold(strings.TrimSpace(os.Getenv("AI500_SHADOW_ENABLED")), "true")
+	result.Provider = strings.TrimSpace(os.Getenv("AI500_PROVIDER"))
+	result.Model = strings.TrimSpace(os.Getenv("AI500_MODEL"))
+	if value := strings.TrimSpace(os.Getenv("AI500_SCORE_TTL")); value != "" {
+		if parsed, err := time.ParseDuration(value); err == nil && parsed > 0 {
+			result.ScoreTTL = parsed
+		}
+	}
+	if value := strings.TrimSpace(os.Getenv("AI500_FEATURE_FRESHNESS")); value != "" {
+		if parsed, err := time.ParseDuration(value); err == nil && parsed > 0 {
+			result.FeatureFreshness = parsed
+		}
+	}
+	if value := strings.TrimSpace(os.Getenv("AI500_OBSERVATION_PATH")); value != "" {
+		result.ObservationPath = value
+	}
+	seen := map[string]struct{}{}
+	for _, raw := range strings.Split(os.Getenv("AI500_SYMBOLS"), ",") {
+		symbol := strings.ToUpper(strings.TrimSpace(raw))
+		symbol = strings.NewReplacer("-", "", "_", "").Replace(symbol)
+		if symbol == "" {
+			continue
+		}
+		if !strings.HasSuffix(symbol, "USDT") {
+			symbol += "USDT"
+		}
+		if _, exists := seen[symbol]; exists {
+			continue
+		}
+		seen[symbol] = struct{}{}
+		result.Symbols = append(result.Symbols, symbol)
+	}
+	return result
 }
 
 // Get returns the global configuration

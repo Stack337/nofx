@@ -35,11 +35,25 @@ type Server struct {
 	parityRunners             map[string]*parity.Runner
 	ai500Store                ai500.ObservationStore
 	ai500Symbols              []string
+	ai500ScoreTTL             time.Duration
 }
 
 func (s *Server) SetAI500CandidateSource(observations ai500.ObservationStore, symbols []string) {
 	s.ai500Store = observations
 	s.ai500Symbols = append([]string(nil), symbols...)
+}
+
+func (s *Server) ConfigureAI500Shadow(enabled bool, observationPath string, symbols []string, scoreTTL time.Duration) error {
+	if !enabled {
+		return nil
+	}
+	observations, err := ai500.NewJSONLStore(observationPath)
+	if err != nil {
+		return err
+	}
+	s.SetAI500CandidateSource(observations, symbols)
+	s.ai500ScoreTTL = scoreTTL
+	return nil
 }
 
 // NewServer Creates API server
@@ -427,6 +441,12 @@ Returns: {"is_running":<bool>,"trader_id":"<string>"}`,
 				`Query: ?agent_id=<EXACT trader_id from GET /api/my-traders>&limit=<int 1..100, default 20>
 Returns: {"cycles":[{"cycle_id":"<string>","state":"scheduled|collecting_context|analysis_round|tool_round|validating|executing|synchronizing|completed|failed","error_code":"<string>","error_message":"<string>"}]}`,
 				s.handleParityCycles)
+			s.routeWithSchema(protected, "GET", "/ai500/latest", "Latest validated AI500 shadow observation",
+				`Query: ?symbol=<symbol>. Returns aggregate and directional score metadata; no credentials or raw prompts.`, s.handleAI500Latest)
+			s.routeWithSchema(protected, "GET", "/ai500/observations", "AI500 shadow observation history",
+				`Query: ?symbol=<optional>&limit=<int 1..100, default 20>. Read-only; no credentials or raw prompts.`, s.handleAI500Observations)
+			s.routeWithSchema(protected, "GET", "/ai500/evaluation", "Offline AI500 shadow evaluation",
+				`Returns deterministic precision, directional accuracy, return, drawdown, and score stability metrics.`, s.handleAI500Evaluation)
 			s.routeWithSchema(protected, "POST", "/parity/cycles/run", "Start one registered parity cycle in its configured mode",
 				`Query: ?agent_id=<EXACT trader_id from GET /api/my-traders>
 Returns: {"cycle_id":"<string>","state":"scheduled"}. Shadow runner must be registered by the application.`,

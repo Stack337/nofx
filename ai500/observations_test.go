@@ -120,6 +120,43 @@ func TestObservationStoreSerializesConcurrentWrites(t *testing.T) {
 	}
 }
 
+func TestObservationStoreListsAllObservationsAndOutcomesAfterRestart(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "private", "observations.jsonl")
+	store, err := NewJSONLStore(path)
+	if err != nil {
+		t.Fatalf("NewJSONLStore: %v", err)
+	}
+	first := storedObservation(time.Date(2026, 8, 20, 8, 0, 0, 0, time.UTC), "BTCUSDT", 70)
+	second := storedObservation(time.Date(2026, 8, 20, 9, 0, 0, 0, time.UTC), "SOLUSDT", 80)
+	if err := store.Put(context.Background(), first); err != nil {
+		t.Fatalf("put first: %v", err)
+	}
+	if err := store.Put(context.Background(), second); err != nil {
+		t.Fatalf("put second: %v", err)
+	}
+	latest, err := store.GetLatest(context.Background(), "SOLUSDT")
+	if err != nil {
+		t.Fatalf("get latest: %v", err)
+	}
+	outcome := OutcomeLabel{ObservationID: latest.ID, Horizon: "1h", ReturnPct: 2, MaxDrawdownPct: -1, LabeledAt: time.Now().UTC()}
+	if err := store.AddOutcome(context.Background(), outcome); err != nil {
+		t.Fatalf("add outcome: %v", err)
+	}
+
+	reopened, err := NewJSONLStore(path)
+	if err != nil {
+		t.Fatalf("reopen: %v", err)
+	}
+	observations, err := reopened.ListObservations(context.Background(), "", 10)
+	if err != nil || len(observations) != 2 || observations[0].Symbol != "SOLUSDT" {
+		t.Fatalf("observations = %#v, error = %v", observations, err)
+	}
+	outcomes, err := reopened.ListOutcomes(context.Background(), 10)
+	if err != nil || len(outcomes) != 1 || outcomes[0].ObservationID != latest.ID {
+		t.Fatalf("outcomes = %#v, error = %v", outcomes, err)
+	}
+}
+
 func countLines(t *testing.T, path string) int {
 	t.Helper()
 	file, err := os.Open(path)

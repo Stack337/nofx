@@ -63,7 +63,11 @@ func normalizeCandidateSymbols(symbols []string) []string {
 	result := make([]string, 0, len(symbols))
 	seen := make(map[string]struct{}, len(symbols))
 	for _, symbol := range symbols {
-		symbol = market.Normalize(strings.TrimSpace(symbol))
+		symbol = strings.TrimSpace(symbol)
+		if symbol == "" {
+			continue
+		}
+		symbol = market.Normalize(symbol)
 		if symbol == "" {
 			continue
 		}
