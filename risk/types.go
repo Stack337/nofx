@@ -41,9 +41,10 @@ type AccountRisk struct {
 }
 
 type AuthorizedDecision struct {
-	Decision     provider.DecisionResponse
-	Notional     float64
-	AuthorizedAt time.Time
+	Decision      provider.DecisionResponse
+	Notional      float64
+	LiveConfirmed bool
+	AuthorizedAt  time.Time
 }
 
 type Rejection struct {
