@@ -135,6 +135,7 @@ PR_DESCRIPTION.md
 # Go build artifacts
 /nofx-server
 .gstack/
+/.worktrees/
 
 # Local AI agent / skill scaffolding (not part of the runtime app)
 .agents/
