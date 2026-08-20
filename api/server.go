@@ -423,6 +423,10 @@ Returns: {"cycles":[{"cycle_id":"<string>","state":"scheduled|collecting_context
 				`Query: ?agent_id=<EXACT trader_id from GET /api/my-traders>
 Returns: {"cycle_id":"<string>","state":"scheduled"}. Shadow runner must be registered by the application.`,
 				s.handleStartParityCycle)
+			s.routeWithSchema(protected, "POST", "/parity/runners", "Register a Bybit read-only, OpenAI-compatible shadow runner",
+				`Query: ?agent_id=<EXACT trader_id from GET /api/my-traders>
+Loads the owned agent model and Bybit account. Execution remains shadow-only and sends no order request.`,
+				s.handleRegisterParityRunner)
 			s.routeWithSchema(protected, "GET", "/account", "Account balance and equity",
 				`Query: ?trader_id=<EXACT trader_id from GET /api/my-traders>
 Returns: {"balance":<float>,"equity":<float>,"unrealized_pnl":<float>,"initial_balance":<float>,"total_return_pct":<float>}`,

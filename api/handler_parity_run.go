@@ -41,6 +41,23 @@ func (s *Server) handleStartParityCycle(c *gin.Context) {
 		})
 		return
 	}
+	userID := c.GetString("user_id")
+	traders, err := s.store.Trader().List(userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to verify agent ownership"})
+		return
+	}
+	owned := false
+	for _, trader := range traders {
+		if trader.ID == agentID {
+			owned = true
+			break
+		}
+	}
+	if !owned {
+		c.JSON(http.StatusNotFound, gin.H{"error": "agent not found"})
+		return
+	}
 
 	cycleID, err := runner.StartCycle(c.Request.Context())
 	if err != nil {

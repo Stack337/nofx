@@ -24,6 +24,10 @@ type CycleSynchronizer interface {
 	Synchronize(context.Context, ExecutionResult) error
 }
 
+type NoopSynchronizer struct{}
+
+func (NoopSynchronizer) Synchronize(context.Context, ExecutionResult) error { return nil }
+
 type CyclePersistence interface {
 	Create(*paritydomain.Cycle, string, map[string]any) error
 	Transition(string, paritydomain.CycleEvent) (*store.ParityCycleRecord, error)

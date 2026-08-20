@@ -52,3 +52,18 @@ func TestHandleStartParityCycleRejectsUnregisteredRunner(t *testing.T) {
 		t.Fatalf("status = %d, want 503", recorder.Code)
 	}
 }
+
+func TestHandleRegisterParityRunnerRequiresAgentID(t *testing.T) {
+	t.Parallel()
+
+	gin.SetMode(gin.TestMode)
+	server := &Server{}
+	recorder := httptest.NewRecorder()
+	context, _ := gin.CreateTestContext(recorder)
+	context.Request = httptest.NewRequest("POST", "/api/parity/runners", nil)
+
+	server.handleRegisterParityRunner(context)
+	if recorder.Code != 400 {
+		t.Fatalf("status = %d, want 400", recorder.Code)
+	}
+}
