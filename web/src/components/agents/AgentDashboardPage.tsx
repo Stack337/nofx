@@ -15,8 +15,13 @@ export function AgentDashboardPage() {
   const [error, setError] = useState('')
   const [busy, setBusy] = useState('')
 
+  const authHeaders = (): Record<string, string> => {
+    const token = localStorage.getItem('auth_token')
+    return token ? { Authorization: `Bearer ${token}` } : {}
+  }
+
   const load = async () => {
-    const response = await fetch('/api/agents')
+    const response = await fetch('/api/agents', { headers: authHeaders() })
     if (!response.ok) throw new Error('Не удалось загрузить агентов')
     const payload = (await response.json()) as { agents: Agent[] }
     setAgents(payload.agents ?? [])
@@ -34,7 +39,7 @@ export function AgentDashboardPage() {
     try {
       const response = await fetch(`/api/agents/${id}/${path}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: body ? JSON.stringify(body) : undefined,
       })
       if (!response.ok) {

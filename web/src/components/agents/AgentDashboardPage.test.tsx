@@ -4,6 +4,7 @@ import { AgentDashboardPage } from './AgentDashboardPage'
 
 describe('AgentDashboardPage', () => {
   beforeEach(() => {
+    localStorage.setItem('auth_token', 'test-token')
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue({
@@ -32,6 +33,10 @@ describe('AgentDashboardPage', () => {
     expect(
       screen.getByRole('button', { name: 'Enable Live' })
     ).toBeInTheDocument()
-    await waitFor(() => expect(fetch).toHaveBeenCalledWith('/api/agents'))
+    await waitFor(() =>
+      expect(fetch).toHaveBeenCalledWith('/api/agents', {
+        headers: { Authorization: 'Bearer test-token' },
+      })
+    )
   })
 })
