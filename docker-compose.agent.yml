@@ -1,0 +1,67 @@
+services:
+  private-agent-postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${AGENT_DB_NAME:-nofx_agent}
+      POSTGRES_USER: ${AGENT_DB_USER:-nofx_agent}
+      POSTGRES_PASSWORD: ${AGENT_DB_PASSWORD:?set AGENT_DB_PASSWORD}
+    volumes:
+      - private-agent-postgres:/var/lib/postgresql/data
+    networks: [private-agent]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 384M
+
+  private-agent:
+    build:
+      context: .
+      dockerfile: docker/agent.Dockerfile
+    restart: unless-stopped
+    ports:
+      - "${AGENT_BIND_IP:-127.0.0.1}:${AGENT_PORT:-18080}:18080"
+    environment:
+      PORT: "18080"
+      DB_TYPE: postgres
+      DB_HOST: private-agent-postgres
+      DB_PORT: "5432"
+      DB_NAME: ${AGENT_DB_NAME:-nofx_agent}
+      DB_USER: ${AGENT_DB_USER:-nofx_agent}
+      DB_PASSWORD: ${AGENT_DB_PASSWORD:?set AGENT_DB_PASSWORD}
+      DB_SSLMODE: disable
+      PRIVATE_AGENT_ENABLED: "true"
+      PRIVATE_AGENT_LIVE_DEFAULT: "false"
+      PRIVATE_AGENT_CYCLE_TIMEOUT: ${PRIVATE_AGENT_CYCLE_TIMEOUT:-120s}
+      PRIVATE_AGENT_MAX_RETRIES: ${PRIVATE_AGENT_MAX_RETRIES:-2}
+      ENCRYPTION_KEY: ${AGENT_ENCRYPTION_KEY:?set AGENT_ENCRYPTION_KEY}
+      AI500_OBSERVATION_PATH: /data/ai500-observations.jsonl
+      AGENT_AUDIT_PATH: /data/audit/events.jsonl
+    volumes:
+      - private-agent-data:/data
+    depends_on:
+      private-agent-postgres:
+        condition: service_healthy
+    networks: [private-agent]
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.75"
+          memory: 768M
+
+networks:
+  private-agent:
+
+volumes:
+  private-agent-postgres:
+  private-agent-data:
